@@ -1,0 +1,82 @@
+/* games.css: DESIGN ONLY. Load it AFTER style.css. No game logic lives here. */
+:root{--paper:#fffdf5;--ink:#2b2350}
+.mascot{font-size:2.4rem;animation:bounce 2s infinite}
+.gcard.wide{grid-column:1/-1}
+@media(max-width:560px){.games{grid-template-columns:1fr}.abcd{grid-template-columns:1fr}.mem{grid-template-columns:repeat(3,1fr)}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
+
+/* color picker (used by Quiz Battle) */
+.prow{display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0;flex-wrap:wrap}
+.swatches{display:flex;gap:8px}
+.sw{width:38px;height:38px;border-radius:50%;padding:0;border:3px solid transparent}
+.sw.on{border-color:#fff;transform:scale(1.15)}
+
+/* Match-It: terms are drop slots, meanings are chips */
+.slots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
+.slot{padding:12px;min-height:70px;border:2px dashed #7c5fd6;border-radius:14px;background:#2e1f63;transition:.2s}
+.slot:hover:not(.ok){border-color:#c4b5fd;background:#3b2a73}
+.slot span{display:block;margin-top:4px;color:#bbf7d0;font-size:.9rem}
+.slot.ok{border:2px solid #22c55e;background:#14532d;animation:pop .4s}
+.slot.no{border-color:#ef4444;background:#7f1d1d;animation:shake .4s}
+.pool{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #4c3a8c}
+.drag{padding:10px 14px;border-radius:12px;background:#4c1d95;cursor:grab;user-select:none;font-size:.95rem}
+.drag:hover{background:#6d28d9}
+.drag.sel{outline:3px solid #facc15}
+@media(max-width:560px){.slots{grid-template-columns:1fr}}
+
+/* Memory: real cards that flip in 3D */
+.mem{perspective:900px;gap:10px}
+.mcard{position:relative;aspect-ratio:3/4;cursor:pointer;transform-style:preserve-3d;transition:transform .5s}
+.mcard.up{transform:rotateY(180deg)}
+.mface{position:absolute;inset:0;display:grid;place-items:center;padding:8px;border-radius:14px;text-align:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:2px solid #fff3}
+.mback{background:repeating-linear-gradient(45deg,#6d28d9 0 8px,#5b21b6 8px 16px);font-size:2.2rem}
+.mfront{transform:rotateY(180deg);font-size:.8rem;line-height:1.25;background:#fffdf5;color:var(--ink)}
+.mfront.term{background:#ede9fe;font-weight:700;font-size:.95rem}
+.mcard.match .mfront{background:#bbf7d0;border-color:#16a34a;animation:glow .8s 2}
+@keyframes glow{50%{box-shadow:0 0 22px #4ade80}}
+
+/* Missing Word: exam paper (targets the card that has the answer box as a direct row) */
+#board>.card:has(>.row>#ans){background:repeating-linear-gradient(transparent 0 31px,#c7d2fe 31px 32px),var(--paper);color:var(--ink);font-family:Georgia,"Times New Roman",serif;border:1px solid #e7e2cf;border-left:6px double #f87171;box-shadow:0 10px 26px #0007;transform:rotate(-.4deg)}
+#board>.card:has(>.row>#ans) h3{font-size:1.4rem;line-height:32px;margin:12px 0 18px}
+#board>.card:has(>.row>#ans) .tag{color:#6b5fa5}
+#board>.card:has(>.row>#ans) input{background:transparent;color:var(--ink);border:0;border-bottom:3px solid #7c3aed;border-radius:0;font-family:inherit;font-size:1.2rem}
+.gap{display:inline-block;min-width:110px;border-bottom:3px solid #7c3aed;margin:0 4px;animation:blink 1.2s infinite alternate}
+.shk{animation:shake .4s;border-color:#ef4444!important}
+@keyframes blink{to{border-color:#f472b6}}
+
+/* True / False buttons */
+.tfb{min-width:130px;font-weight:700}
+.tfb.a3{background:#16a34a}.tfb.a0{background:#dc2626}
+.tfb.ok{animation:pulse .5s 2;box-shadow:0 0 18px #4ade80}
+.tfb.no{animation:shake .4s}
+
+/* Space Launch: square viewport, world scrolls DOWN while rocket stays put */
+.sky{position:relative;width:320px;height:320px;max-width:100%;margin:12px auto;border-radius:18px;overflow:hidden;border:2px solid #4c3a8c}
+#world{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(to top,#86efac 0,#7dd3fc 4%,#38bdf8 24%,#2563eb 42%,#1e1b6b 56%,#0b0620 70%,#020010 100%);will-change:transform}
+.grnd{position:absolute;left:0;right:0;bottom:0;height:50px;background:#4ade80}
+.road2{position:absolute;left:0;right:0;bottom:0;height:20px;background:#374151;border-top:3px dashed #fde68a}
+.it{position:absolute;line-height:1}
+.bird{animation:glide 4s ease-in-out infinite alternate}
+.star{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;animation:twinkle 2s infinite alternate}
+#rocket{position:absolute;left:50%;bottom:30px;font-size:46px;line-height:1;z-index:3;transform:translateX(-50%) rotate(-45deg)}
+#rocket.burn{filter:drop-shadow(0 16px 8px #f97316);animation:rshake .12s infinite}
+#rocket.slow{animation:rwob .6s 4}
+#rocket.boom{animation:boom 1.6s forwards}
+#qa{margin-top:10px}
+.good{color:#4ade80}.badc{color:#f87171}
+@keyframes rshake{50%{transform:translateX(-50%) rotate(-45deg) translate(2px,2px)}}
+@keyframes rwob{50%{transform:translateX(-50%) rotate(-25deg)}}
+@keyframes boom{to{transform:translateX(-50%) rotate(-45deg) scale(3.5);opacity:0}}
+@keyframes twinkle{to{opacity:.2}}
+@keyframes glide{to{transform:translateX(30px)}}
+
+/* Quiz Battle: player colors drive the whole screen */
+.bt-hud{display:flex;gap:10px;align-items:stretch}
+.bt-p{flex:1;padding:10px;border-radius:14px;background:#2e1f63;border:3px solid var(--c);text-align:center}
+.bt-p small{display:block;color:#b9a9f0}
+.bt-p b{font-size:1.8rem}
+.bt-p.hit{animation:shake .4s;background:#4a1d2e}
+.bt-vs{align-self:center;font-weight:800}
+.bt-bar{display:flex;height:14px;border-radius:8px;overflow:hidden;margin:10px 0;background:#120a2a}
+.bt-bar i{display:block;transition:width .6s}
+.bt-msg{min-height:1.5em;margin:12px 0 0;font-weight:700;text-align:center}
