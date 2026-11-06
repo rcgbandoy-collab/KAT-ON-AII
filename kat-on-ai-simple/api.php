@@ -12,6 +12,74 @@ function fail($m) {
     exit;
 }
 
+function readUploadedText($tmp, $name) {
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+    if ($ext === 'txt') {
+        $text = @file_get_contents($tmp);
+        if ($text === false) {
+            return [false, 'Could not read the TXT file.'];
+        }
+        return [true, (string) $text];
+    }
+
+    if (!in_array($ext, ['docx', 'pptx', 'zip'], true)) {
+        return [false, 'Please use TXT, DOCX, PPTX or ZIP. For a PDF, copy the text and paste it in the box.'];
+    }
+
+    if (!class_exists('ZipArchive')) {
+        return [false, 'ZIP support is not available on this server.'];
+    }
+
+    $zip = new ZipArchive;
+    if ($zip->open($tmp) !== true) {
+        return [false, 'Cannot open that file.'];
+    }
+
+    $xml = '';
+    $foundText = false;
+
+    $docPath = 'word/document.xml';
+    if ($zip->locateName($docPath) !== false) {
+        $xml = str_replace('</w:p>', "\n", (string) $zip->getFromName($docPath));
+        $foundText = true;
+    } elseif ($zip->locateName('ppt/presentation.xml') !== false || $zip->locateName('ppt/slides/slide1.xml') !== false) {
+        $names = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $n = $zip->getNameIndex($i);
+            if (preg_match('#^ppt/slides/slide(\d+)\.xml$#', $n, $m)) {
+                $names[(int) $m[1]] = $n;
+            }
+        }
+        ksort($names);
+        foreach ($names as $n) {
+            $xml .= str_replace('</a:p>', "\n", (string) $zip->getFromName($n));
+        }
+        $foundText = !empty($xml);
+    } elseif ($ext === 'zip') {
+        $textFiles = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $n = $zip->getNameIndex($i);
+            if (preg_match('/\.txt$/i', $n)) {
+                $textFiles[] = $n;
+            }
+        }
+        if (!empty($textFiles)) {
+            $xml = (string) $zip->getFromName($textFiles[0]);
+            $foundText = true;
+        }
+    }
+
+    $zip->close();
+
+    if (!$foundText) {
+        return [false, 'No readable text was found in that ZIP file.'];
+    }
+
+    $text = html_entity_decode(strip_tags($xml));
+    return [true, $text];
+}
+
 set_error_handler(function ($errno, $errstr, $errfile, $errline) {
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 });
@@ -32,30 +100,21 @@ try {
     $text = trim($_POST['pasted'] ?? '');
     $level = in_array($_POST['level'] ?? '', ['easy', 'medium', 'hard']) ? $_POST['level'] : 'easy';
 
-    if ($text === '' && isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
-        $tmp = $_FILES['file']['tmp_name'];
-        $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
-        if ($ext === 'txt') {
-            $text = file_get_contents($tmp);
-        } elseif ($ext === 'docx' || $ext === 'pptx') {
-            $zip = new ZipArchive;
-            if ($zip->open($tmp) !== true) fail('Cannot open that file.');
-            $xml = '';
-            if ($ext === 'docx') {
-                $xml = str_replace('</w:p>', "\n", (string) $zip->getFromName('word/document.xml'));
-            } else {
-                $names = [];
-                for ($i = 0; $i < $zip->numFiles; $i++) {
-                    $n = $zip->getNameIndex($i);
-                    if (preg_match('#^ppt/slides/slide(\d+)\.xml$#', $n, $m)) $names[(int) $m[1]] = $n;
-                }
-                ksort($names);
-                foreach ($names as $n) $xml .= str_replace('</a:p>', "\n", $zip->getFromName($n));
+    if ($text === '' && isset($_FILES['file'])) {
+        if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            if ($_FILES['file']['error'] === UPLOAD_ERR_NO_FILE) {
+                fail('No file was uploaded.');
             }
-            $text = html_entity_decode(strip_tags($xml));
-        } else {
-            fail('Please use TXT, DOCX or PPTX. For a PDF, copy the text and paste it in the box.');
+            fail('File upload failed (error code ' . (int) $_FILES['file']['error'] . ').');
         }
+
+        $tmp = $_FILES['file']['tmp_name'];
+        $name = $_FILES['file']['name'];
+        [$ok, $fileText] = readUploadedText($tmp, $name);
+        if (!$ok) {
+            fail($fileText);
+        }
+        $text = $fileText;
     }
 
     $text = trim(preg_replace('/[ \t]+/', ' ', $text));
@@ -68,13 +127,13 @@ try {
 
     function build_prompt($i, $n, $level, $part) {
         return "Study material, part $i of $n (difficulty: $level). Use ONLY facts from this part. Return ONLY JSON:
-{\"title\":\"\",\"category\":\"school subject\",\"overview\":\"2-3 sentences\",\"topics\":[\"\"],
-\"keywords\":[{\"term\":\"\",\"definition\":\"max 12 words\",\"topic\":\"\"}],
-\"quiz\":[{\"q\":\"\",\"choices\":[\"\",\"\",\"\",\"\"],\"answer\":0,\"topic\":\"\"}],
-\"tf\":[{\"s\":\"statement\",\"a\":true,\"topic\":\"\"}],
-\"blanks\":[{\"s\":\"sentence with ____ where the word is missing\",\"a\":\"missing word\",\"topic\":\"\"}],
-\"ids\":[{\"kind\":\"enumeration|identification|definition|listing|person|explanation\",\"q\":\"\",\"a\":\"\",\"topic\":\"\"}]}
-Rules: 2-4 topics. 12 keywords (names, dates, terms, concepts); at least 7 are ONE word of 3-10 letters (letters only, plain ASCII). 8 quiz questions with 4 choices, answer = index 0-3. 6 true/false (about half false). 6 blanks (missing word = 1-2 words from the text). 8 ids using every kind: enumeration 'What are the types of...?', identification 'It is known as...', definition 'It is called...', listing 'What are the...?', person 'Who is...?', explanation 'Why does...?'. For enumeration and listing, a = 2-5 items separated by semicolons. For explanation, a = short answer, max 12 words. Use plain ASCII hyphens and quotes. Every topic must come from your topics list.
+{"title":"","category":"school subject","overview":"2-3 sentences","topics":[""],
+"keywords":[{"term":"","definition":"max 12 words","topic":""}],
+"quiz":[{"q":"","choices":["","","",""],"answer":0,"topic":""}],
+"tf":[{"s":"statement","a":true,"topic":""}],
+"blanks":[{"s":"sentence with ____ where the word is missing","a":"missing word","topic":""}],
+"ids":[{"kind":"enumeration|identification|definition|listing|person|explanation","q":"","a":"","topic":""}]}
+Rules: 2-4 topics. 12 keywords (names, dates, terms, concepts); at least 7 are ONE word of 3-10 letters (letters only, plain ASCII). 8 quiz questions with 4 choices, answer = index 0-3. 6 true/false statements, 6 blanks, 6 IDs. Keep all answers fact-based and brief. Output valid JSON only. Do not include markdown fences or extra text.
 MATERIAL:
 $part";
     }
