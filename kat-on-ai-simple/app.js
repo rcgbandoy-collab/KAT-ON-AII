@@ -108,8 +108,10 @@ $('go').onclick = async () => {
   $('go').disabled = true;
   try {
     const r = await fetch('api.php', { method: 'POST', body: fd });
-    const j = await r.json();
-    if (j.error) throw new Error(j.error);
+    const text = await r.text();
+    let j = null;
+    try { j = text ? JSON.parse(text) : null; } catch { throw new Error(text || 'Unexpected server response.'); }
+    if (!r.ok || j?.error) throw new Error(j?.error || 'Request failed (' + r.status + ')');
     j.keywords = (j.keywords || []).filter(k => k.term && k.definition);
     j.quiz = (j.quiz || []).filter(q => q.q && Array.isArray(q.choices) && q.choices.length >= 2)
       .map(q => ({ ...q, choices: q.choices.slice(0, 4), answer: Number(q.answer) }))
